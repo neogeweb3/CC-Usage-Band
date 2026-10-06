@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { bar, desktopSvg, detectStyle, fmtLeft, fmtTokens, hitRate, layout, to256, width } from '../hooks/register'
+import { bar, desktopSvg, detectStyle, expire, fmtLeft, fmtTokens, hitRate, layout, newer, to256, width } from '../hooks/register'
 import type { Measure } from '../types'
 
 const BAND = {
@@ -189,4 +189,33 @@ test('a redraw that changes nothing visible is not written', async ($, on) => {
   expect(desktopSvg(m, null, at).svg).toBe(
     desktopSvg({ ...m, context: { ...m.context, tokens: 100_040 } }, null, at).svg,
   )
+})
+
+// neo-local patch (2026-10-06): an idle session froze at 99% while others reached 100% and reset
+test('a window past its reset time reads 0%, and one still running is untouched', async () => {
+  const at = Date.parse('2026-10-06T12:00:00Z')
+  const m: Measure = {
+    context: { tokens: 1, window: 1_000_000, percent: 0 },
+    rateLimits: [
+      { kind: 'five_hour', percentUsed: 99, resetsAt: '2026-10-06T11:00:00Z' },
+      { kind: 'seven_day', percentUsed: 40, resetsAt: '2026-10-08T00:00:00Z' },
+    ],
+  }
+  const live = expire(m, at)!
+  expect(live.rateLimits[0]).toEqual({ kind: 'five_hour', percentUsed: 0 })
+  expect(live.rateLimits[1]).toEqual(m.rateLimits[1])
+  expect(desktopSvg(live, null, at).svg).toContain('>0%<')
+  expect(expire(m, Date.parse('2026-10-06T10:00:00Z'))).toBe(m)
+  expect(expire(null, at)).toBe(null)
+})
+
+test('the newer reading wins, a malformed shared file never does', async () => {
+  const mine = { at: 100, rateLimits: [{ kind: 'five_hour', percentUsed: 99 }] }
+  const theirs = { at: 200, rateLimits: [{ kind: 'five_hour', percentUsed: 100 }] }
+  expect(newer(mine, theirs)).toEqual(theirs)
+  expect(newer(theirs, mine)).toBe(theirs)
+  expect(newer(mine, null)).toBe(mine)
+  expect(newer(mine, { at: 999 })).toBe(mine)
+  expect(newer(mine, { at: 999, rateLimits: [] })).toBe(mine)
+  expect(newer(mine, 'garbage')).toBe(mine)
 })

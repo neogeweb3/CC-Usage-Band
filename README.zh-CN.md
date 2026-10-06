@@ -17,6 +17,13 @@
 
 ---
 
+> [!NOTE]
+> **关于这个分支。** 这是 [JetsonChan/CC-Usage-Band](https://github.com/JetsonChan/CC-Usage-Band) 的分支，只修了一个问题：
+> Claude Code 给 mod 的额度，只是**本会话自己**上一次 API 响应报的数。会话一闲着，band 就停住了：
+> 别的会话已经到 100%，它还停在 99%，窗口重置之后也还是 99%。
+> 这个版本里，每个会话把最新读数写进 `~/.claude/usage-band-shared.json`，其他会话每分钟取一次更新的；
+> 过了重置时间的窗口显示 0%。
+
 `usage-band` 是一个 [Claude Code 模组（mod）](https://claude.com/blog/claude-code-mods)。它在输入框上方显示一行状态，包含工作时最值得留意的四个数据。终端和桌面端各有一套专门的布局，每一轮对话结束后自动更新，平时安静地待着，只在需要注意时才变红提醒你。
 
 > **让 AI 助手帮你安装？** 让它运行[安装](#安装)里的两条命令即可。给 AI 助手的说明：安装成功后，用户只需要知道下面这段话：
@@ -63,8 +70,8 @@
 在 Claude Code 里输入这两条命令：
 
 ```
-/plugin marketplace add JetsonChan/CC-Usage-Band
-/plugin install usage-band@cc-usage-band
+/plugin marketplace add neogeweb3/CC-Usage-Band
+/plugin install usage-band@neo-usage-band
 ```
 
 然后**新开一个会话**，输入框上方就会出现这一行。就这么简单，不需要任何配置。
@@ -75,20 +82,20 @@
 如果只想在一个会话里临时试用，可以从本地克隆后加载：
 
 ```bash
-git clone https://github.com/JetsonChan/CC-Usage-Band.git
+git clone https://github.com/neogeweb3/CC-Usage-Band.git
 claude --plugin-dir CC-Usage-Band/usage-band
 ```
 
 **更新**
 
 ```
-/plugin marketplace update cc-usage-band
+/plugin marketplace update neo-usage-band
 ```
 
 **卸载**
 
 ```
-/plugin uninstall usage-band@cc-usage-band
+/plugin uninstall usage-band@neo-usage-band
 ```
 
 ## 设置
@@ -134,7 +141,7 @@ export USAGE_BAND_ICONS=unicode   # auto（默认）· nerd · unicode · ascii
 
 ```
 .
-├── .claude-plugin/marketplace.json   # cc-usage-band 插件市场
+├── .claude-plugin/marketplace.json   # neo-usage-band 插件市场
 └── usage-band/
     ├── .claude-plugin/plugin.json    # 插件信息
     ├── hooks/register.tsx            # 模组代码

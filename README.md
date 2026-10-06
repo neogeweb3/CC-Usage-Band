@@ -17,6 +17,13 @@ English · [简体中文](./README.zh-CN.md)
 
 ---
 
+> [!NOTE]
+> **About this fork.** This is a fork of [JetsonChan/CC-Usage-Band](https://github.com/JetsonChan/CC-Usage-Band) with one fix.
+> Claude Code hands a mod only the limits reported by *that session's own* last API response, so a session sitting idle froze:
+> its band stayed at 99% while other sessions reached 100%, and stayed there after the window reset.
+> Here every session shares its newest reading through `~/.claude/usage-band-shared.json` and adopts a newer one on its
+> one-minute tick, and a window past its reset time reads 0%.
+
 `usage-band` is a [Claude Code mod](https://claude.com/blog/claude-code-mods) that draws a single line above the prompt with the four numbers worth watching while you work. It has its own layout for the terminal and for the desktop app, updates itself after every turn, and stays out of the way until something needs attention.
 
 > **Installing with an AI agent?** Have it run the two commands under [Installation](#installation). Agents: once it succeeds, this is all the user needs to hear:
@@ -61,8 +68,8 @@ English · [简体中文](./README.zh-CN.md)
 Run these two commands inside Claude Code:
 
 ```
-/plugin marketplace add JetsonChan/CC-Usage-Band
-/plugin install usage-band@cc-usage-band
+/plugin marketplace add neogeweb3/CC-Usage-Band
+/plugin install usage-band@neo-usage-band
 ```
 
 Then **open a new session**. The band appears above the prompt. That's it, nothing to configure.
@@ -73,20 +80,20 @@ Then **open a new session**. The band appears above the prompt. That's it, nothi
 To try it for one session from a local checkout instead:
 
 ```bash
-git clone https://github.com/JetsonChan/CC-Usage-Band.git
+git clone https://github.com/neogeweb3/CC-Usage-Band.git
 claude --plugin-dir CC-Usage-Band/usage-band
 ```
 
 **Update**
 
 ```
-/plugin marketplace update cc-usage-band
+/plugin marketplace update neo-usage-band
 ```
 
 **Uninstall**
 
 ```
-/plugin uninstall usage-band@cc-usage-band
+/plugin uninstall usage-band@neo-usage-band
 ```
 
 ## Configuration
@@ -132,7 +139,7 @@ It does not read or write files, run processes, call the network or send any dat
 
 ```
 .
-├── .claude-plugin/marketplace.json   # the cc-usage-band marketplace
+├── .claude-plugin/marketplace.json   # the neo-usage-band marketplace
 └── usage-band/
     ├── .claude-plugin/plugin.json    # manifest
     ├── hooks/register.tsx            # the mod

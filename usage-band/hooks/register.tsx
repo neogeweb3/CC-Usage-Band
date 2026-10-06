@@ -353,12 +353,67 @@ export const describe = (m: Measure | null, t: TurnTokens | null) => {
   return parts.join(', ')
 }
 
+// ---- Limits that stay true while the session sits idle (neo-local patch, 2026-10-06)
+// `$.session.usage()` and `session.measure` carry the windows the last API response of *this*
+// session reported, so an idle session froze at 99% while busy ones reached 100% and then reset.
+// Two fixes: a window past its reset time reads as 0%, and every session shares its newest reading
+// through one file, which every session adopts on its minute tick when that reading is newer.
+
+// A window whose reset time has passed has reset: 0% used, and no countdown until a response
+// reports the new window
+export const expire = (m: Measure | null, at: number): Measure | null => {
+  if (!m || !at) return m
+  let changed = false
+  const rateLimits = m.rateLimits.map(l => {
+    if (!l.resetsAt || Date.parse(l.resetsAt) > at) return l
+    changed = true
+    return { kind: l.kind, percentUsed: 0 }
+  })
+  return changed ? { ...m, rateLimits } : m
+}
+
+export type Shared = { at: number; rateLimits: Limit[] }
+
+// The newer of two readings, by when they were taken; a malformed shared file never wins
+export const newer = (mine: Shared, theirs: unknown): Shared => {
+  const s = theirs as Shared | null
+  if (!s || typeof s.at !== 'number' || !Array.isArray(s.rateLimits) || s.rateLimits.length === 0) return mine
+  return s.at > mine.at ? { at: s.at, rateLimits: s.rateLimits } : mine
+}
+
+let sharedPath: string | null = null
+let mine: Shared = { at: 0, rateLimits: [] }
+
+const publish = async ($: EngineInterface, rateLimits: Limit[]) => {
+  if (rateLimits.length === 0) return
+  mine = { at: await $.clock.now(), rateLimits }
+  if (sharedPath) await $.fs.write(sharedPath, JSON.stringify(mine)).catch(() => undefined)
+}
+
+const adopt = async ($: EngineInterface) => {
+  if (!sharedPath) return
+  const text = await $.fs.read(sharedPath).catch(() => null)
+  if (typeof text !== 'string') return
+  let theirs: unknown = null
+  try {
+    theirs = JSON.parse(text)
+  } catch {
+    return // caught mid-write by another session; the next tick reads it whole
+  }
+  const best = newer(mine, theirs)
+  if (best === mine) return
+  mine = best
+  const m = await read($, measure)
+  if (m) await setMeasure($, { ...m, rateLimits: best.rateLimits })
+}
+
 // The desktop app redraws the band, and its frame blinks, on every write a drawing reads. So a
 // reading is only written when it changes what the band shows: a new token count that rounds to
 // the same figure, or a clock tick that leaves every countdown as it was, writes nothing.
-const shown = (m: Measure | null, t: TurnTokens | null, at: number) => desktopSvg(m, t, at).svg
+const shown = (m: Measure | null, t: TurnTokens | null, at: number) => desktopSvg(expire(m, at), t, at).svg
 
 const tick = async ($: EngineInterface) => {
+  await adopt($)
   const at = await $.clock.now()
   const [m, t, was] = [await read($, measure), await read($, turn), await read($, now)]
   if (was && shown(m, t, was) === shown(m, t, at)) return
@@ -412,6 +467,8 @@ export const register: Register = on => {
     const result = await next(e)
     setting = ((await $.env.get('USAGE_BAND_ICONS')) ?? 'auto').trim().toLowerCase() || 'auto'
     const term = await $.env.get('TERM_PROGRAM')
+    const home = await $.env.get('HOME')
+    sharedPath = home ? `${home}/.claude/usage-band-shared.json` : null
     await update($, style, () => detectStyle(setting, term))
     await $.command.register({
       name: PREVIEW,
@@ -437,6 +494,8 @@ export const register: Register = on => {
       rateLimits: e.rateLimits.map(({ kind, percentUsed, resetsAt }) => ({ kind, percentUsed, resetsAt })),
     }
     await setMeasure($, m)
+    // A response just reported these windows: the freshest reading any session has
+    await publish($, m.rateLimits)
     await tick($)
     return next(e)
   })
@@ -487,9 +546,9 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    const m = await read($, measure)
     const t = await read($, turn)
     const at = await read($, now)
+    const m = expire(await read($, measure), at)
     if (e.props.hasSurvey || (m === null && t === null)) return next(e)
 
     // Desktop and mobile animate inside the SVG, so they never read the frame counter

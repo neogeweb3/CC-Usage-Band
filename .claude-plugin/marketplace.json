@@ -1,17 +1,17 @@
 {
-  "name": "cc-usage-band",
+  "name": "neo-usage-band",
   "owner": {
-    "name": "Jetson Chan"
+    "name": "Neo Ge"
   },
   "metadata": {
-    "description": "usage-band, a Claude Code mod by Jetson Chan"
+    "description": "usage-band, a Claude Code mod by Jetson Chan; this fork keeps idle sessions in step with the newest limits"
   },
   "plugins": [
     {
       "name": "usage-band",
       "source": "./usage-band",
       "description": "5h/7d limits, context window and cache hit rate above the prompt, for the terminal and the desktop app",
-      "version": "1.0.6"
+      "version": "1.0.6-neo.1"
     }
   ]
 }

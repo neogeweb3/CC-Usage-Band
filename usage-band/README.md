@@ -25,8 +25,8 @@ A single centered row drawn as SVG: limit bars with the figure and reset time be
 ## Install
 
 ```
-/plugin marketplace add JetsonChan/CC-Usage-Band
-/plugin install usage-band@cc-usage-band
+/plugin marketplace add neogeweb3/CC-Usage-Band
+/plugin install usage-band@neo-usage-band
 ```
 
 Then open a new session (or run `/reload-plugins`). Nothing to configure. Best in [Ghostty](https://ghostty.org), which ships the icon font.
