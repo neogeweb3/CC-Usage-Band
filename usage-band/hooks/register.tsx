@@ -547,18 +547,19 @@ export const register: Register = on => {
     )
   })
 
-  // Other mods draw above the prompt too (goal-meter's progress band): take what the hooks
-  // beneath drew and stack the band on top of it, never in place of it
+  // Other mods draw above the prompt too (goal-meter's row): take what the hooks beneath drew
+  // and keep the band under it, right on top of the prompt, never in place of it. Whichever
+  // order the plugins load in, the band stays the row nearest the prompt.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    const below = await next(e)
+    const above = await next(e)
     const mine = await drawBand($, e)
-    if (!mine) return below
-    if (!below) return mine
+    if (!mine) return above
+    if (!above) return mine
     const { Box } = $.ui.resolve(e)
     return (
       <Box flexDirection="column">
+        {above}
         {mine}
-        {below}
       </Box>
     )
   })

@@ -223,7 +223,7 @@ test('the newer reading wins, a malformed shared file never does', async () => {
   expect(newer(mine, 'garbage')).toBe(mine)
 })
 
-test('the band stacks on top of what another mod drew above the prompt, never replacing it', async ($, on) => {
+test('the band keeps under what another mod drew above the prompt, never replacing it', async ($, on) => {
   // another mod beneath the band (goal-meter's progress band, say)
   on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
     const { Text } = $.ui.resolve(e)
@@ -238,6 +238,10 @@ test('the band stacks on top of what another mod drew above the prompt, never re
   const term = await $.ui.mount({ plugin: 'usage-band', surface: 'terminal', ...BAND })
   expect(await term.find({ type: 'Text', text: 'goal 40%' })).toBeDefined()
   expect(await term.find({ type: 'Text', text: /^20%$/ })).toBeDefined()
+  // the other mod's row first, the band last: nearest the prompt
+  const tree = JSON.stringify(await term.drawn())
+  expect(tree.indexOf('goal 40%')).toBeGreaterThan(-1)
+  expect(tree.indexOf('goal 40%')).toBeLessThan(tree.indexOf('"20%"'))
   await term.unmount()
   const desk = await $.ui.mount({ plugin: 'usage-band', surface: 'desktop', ...BAND })
   expect(await desk.find({ type: 'Text', text: 'goal 40%' })).toBeDefined()
