@@ -21,6 +21,8 @@ test('formats tokens, countdowns and hit rate', async () => {
 })
 
 test('band shows limits, context and the last turn on terminal and desktop', async ($, on) => {
+  // the engine beneath the band, which draws nothing above the prompt here
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => $.ui.resolve(e).Box({ children: [] }))
   on('session.measure', ($, e) => ({ changed: e.changed }))
   on('turn.complete', () => ({ text: '' }))
 
@@ -156,6 +158,7 @@ test('desktop context is a 2×10 dot matrix, top row first', async () => {
 })
 
 test('the terminal bar animates once the band is drawn', async ($, on) => {
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => $.ui.resolve(e).Box({ children: [] }))
   const clock = mock.clock(on)
   on('session.measure', ($, e) => ({ changed: e.changed }))
   await $.session.measure({
@@ -218,4 +221,26 @@ test('the newer reading wins, a malformed shared file never does', async () => {
   expect(newer(mine, { at: 999 })).toBe(mine)
   expect(newer(mine, { at: 999, rateLimits: [] })).toBe(mine)
   expect(newer(mine, 'garbage')).toBe(mine)
+})
+
+test('the band stacks on top of what another mod drew above the prompt, never replacing it', async ($, on) => {
+  // another mod beneath the band (goal-meter's progress band, say)
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return Text({ children: ['goal 40%'] })
+  })
+  on('session.measure', ($, e) => ({ changed: e.changed }))
+  await $.session.measure({
+    context: { tokens: 100_000, window: 1_000_000, percent: 10 },
+    rateLimits: [{ kind: 'five_hour', percentUsed: 20 }],
+    changed: ['context', 'rateLimits'],
+  })
+  const term = await $.ui.mount({ plugin: 'usage-band', surface: 'terminal', ...BAND })
+  expect(await term.find({ type: 'Text', text: 'goal 40%' })).toBeDefined()
+  expect(await term.find({ type: 'Text', text: /^20%$/ })).toBeDefined()
+  await term.unmount()
+  const desk = await $.ui.mount({ plugin: 'usage-band', surface: 'desktop', ...BAND })
+  expect(await desk.find({ type: 'Text', text: 'goal 40%' })).toBeDefined()
+  expect(await desk.find({ type: 'Svg' })).toBeDefined()
+  await desk.unmount()
 })

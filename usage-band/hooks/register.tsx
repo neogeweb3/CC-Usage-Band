@@ -457,11 +457,12 @@ export const WELCOME =
   'usage-band is on: your 5h and 7d limits, context window and cache hit rate now show above the prompt. ' +
   'The limits fill in after Claude’s first reply.'
 
+// The terminal animates by redrawing; started by its first draw, so a desktop-only session
+// never runs it. A reload drops the timer and this flag together.
+let isAnimating = false
+
 export const register: Register = on => {
   let setting = 'auto'
-  // The terminal animates by redrawing; started by its first draw, so a desktop-only session
-  // never runs it. A reload drops the timer and this flag together.
-  let isAnimating = false
 
   on('session.start', async ($, e, next) => {
     const result = await next(e)
@@ -494,8 +495,9 @@ export const register: Register = on => {
       rateLimits: e.rateLimits.map(({ kind, percentUsed, resetsAt }) => ({ kind, percentUsed, resetsAt })),
     }
     await setMeasure($, m)
-    // A response just reported these windows: the freshest reading any session has
-    await publish($, m.rateLimits)
+    // A response just reported these windows: the freshest reading any session has.
+    // Sharing is a courtesy: a failure here never costs this session its own band.
+    await publish($, m.rateLimits).catch(() => undefined)
     await tick($)
     return next(e)
   })
@@ -545,11 +547,28 @@ export const register: Register = on => {
     )
   })
 
+  // Other mods draw above the prompt too (goal-meter's progress band): take what the hooks
+  // beneath drew and stack the band on top of it, never in place of it
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    const below = await next(e)
+    const mine = await drawBand($, e)
+    if (!mine) return below
+    if (!below) return mine
+    const { Box } = $.ui.resolve(e)
+    return (
+      <Box flexDirection="column">
+        {mine}
+        {below}
+      </Box>
+    )
+  })
+}
+
+const drawBand = async ($: EngineInterface, e: any) => {
     const t = await read($, turn)
     const at = await read($, now)
     const m = expire(await read($, measure), at)
-    if (e.props.hasSurvey || (m === null && t === null)) return next(e)
+    if (e.props.hasSurvey || (m === null && t === null)) return null
 
     // Desktop and mobile animate inside the SVG, so they never read the frame counter
     if (e.surface === 'desktop' || e.surface === 'mobile') {
@@ -582,5 +601,4 @@ export const register: Register = on => {
         ))}
       </Box>
     )
-  })
 }
